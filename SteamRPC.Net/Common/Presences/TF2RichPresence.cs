@@ -94,7 +94,7 @@ namespace SteamRPC.Net.Presences
         {
             string details;
             var map = !string.IsNullOrWhiteSpace(CurrentMap)
-                ? $"\n({CurrentMap})"
+                ? $"({CurrentMap})"
                 : string.Empty;
 
             switch (PresenceState)
