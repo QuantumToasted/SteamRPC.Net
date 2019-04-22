@@ -2,6 +2,8 @@
 using System.IO;
 using System.Timers;
 using DiscordRPC;
+using DiscordRPC.Message;
+using SteamRPC.Net.Presences;
 using Steamworks;
 
 namespace SteamRPC.Net
@@ -14,6 +16,7 @@ namespace SteamRPC.Net
         private readonly Timer _timer;
         private readonly string _imageKey;
         private readonly string _imageText;
+        private int _elapsedCount;
 
         public RichPresenceConverter(ulong rpcClientId, ulong steamUserId, 
             SteamAppId appId = SteamAppId.TF2, bool autoStart = true,
@@ -30,7 +33,7 @@ namespace SteamRPC.Net
             {
                 AutoReset = true,
                 Enabled = false,
-                Interval = 10000
+                Interval = 1000
             };
 
             _imageKey = imageKey;
@@ -41,18 +44,15 @@ namespace SteamRPC.Net
 
         public User RichPresenceUser { get; private set; }
 
-        public RichPresence CurrentRichPresence { get; private set; }
-
         public void Initialize()
         {
             SubscribeToEvents();
 
             if (!Client.Initialize())
-                LogMessage(
-                    $"Could not initialize a Discord IPC connection with application ID {Client.ApplicationID}.",
+                Log?.Invoke($"Could not initialize a Discord IPC connection with application ID {Client.ApplicationID}.",
                     "RPC", LogLevel.Critical);
 
-            LogMessage("Initialized.", "RPC", LogLevel.Info);
+            Log?.Invoke("Initialized.", "RPC", LogLevel.Info);
 
             try
             {
@@ -60,19 +60,36 @@ namespace SteamRPC.Net
             }
             catch (Exception ex)
             {
-                LogMessage($"Could not write out game app ID to file: {ex.Message}", "Steamworks", LogLevel.Critical);
+                Log?.Invoke($"Could not write out game app ID to file: {ex.Message}", "Steamworks", LogLevel.Critical);
             }
 
             if (!SteamAPI.Init())
-                LogMessage($"Could not initialize a Steamworks connection for app ID {_appId:D}.", "Steamworks",
+                Log?.Invoke($"Could not initialize a Steamworks connection for app ID {_appId:D}.", "Steamworks",
                     LogLevel.Critical);
 
-            LogMessage("Initialized.", "Steamworks", LogLevel.Info);
+            Log?.Invoke("Initialized.", "Steamworks", LogLevel.Info);
         }
 
         public void Start()
         {
             _timer.Start();
+
+            SteamRichPresence presence;
+            switch (_appId)
+            {
+                case SteamAppId.TF2:
+                    presence = new TF2RichPresence(_steamId, new Assets
+                    {
+                        LargeImageKey = _imageKey,
+                        LargeImageText = _imageText
+                    });
+                    break;
+                default:
+                    presence = new DefaultRichPresence();
+                    break;
+            }
+
+            Client.SetPresence(presence);
         }
 
         public void Stop()
@@ -80,16 +97,82 @@ namespace SteamRPC.Net
             _timer.Stop();
         }
 
-        public void UpdatePresence()
-        {
-            Client.SetPresence(new SteamRichPresence(_steamId, _imageKey, _imageText));
-        }
-
         public void Dispose()
         {
             File.Delete("steam_appid.txt");
             Client?.Dispose();
             _timer?.Dispose();
+        }
+
+        private void SubscribeToEvents()
+        {
+            Client.OnReady += HandleClientReady;
+            _timer.Elapsed += (_, __) => UpdatePresence();
+        }
+
+        private void UpdatePresence()
+        {
+            if (_elapsedCount <= 10)
+            {
+                _elapsedCount++;
+                return;
+            }
+
+            SteamRichPresence presence;
+            switch (_appId)
+            {
+                case SteamAppId.TF2:
+                    presence = new TF2RichPresence(_steamId, new Assets
+                    {
+                        LargeImageKey = _imageKey,
+                        LargeImageText = _imageText
+                    });
+                    break;
+                default:
+                    presence = new DefaultRichPresence();
+                    break;
+            }
+
+            var updated = false;
+            if (/*presence.State != default && */SteamRichPresence.LastPresence?.State != presence.State)
+            {
+                StateUpdated?.Invoke(presence.State);
+                updated = true;
+            }
+
+            if (/*presence.Details != default && */SteamRichPresence.LastPresence?.Details != presence.Details)
+            {
+                DetailsUpdated?.Invoke(presence.Details);
+                updated = true;
+            }
+
+            if (/*presence.Party != default && */presence.Party?.Size != SteamRichPresence.LastPresence?.Party?.Size)
+            {
+                PartyUpdated?.Invoke(presence.Party);
+                updated = true;
+            }
+
+            if (/*presence.Timestamps?.Start != default && */
+                presence.Timestamps?.Start != SteamRichPresence.LastPresence?.Timestamps?.Start)
+            {
+                TimestampsUpdated?.Invoke(presence.Timestamps);
+                updated = true;
+            }
+
+            if (updated)
+            {
+                SteamRichPresence.LastPresence = presence;
+            }
+        }
+
+        private void HandleClientReady(object sender, ReadyMessage message)
+        {
+            RichPresenceUser = message.User;
+            Log?.Invoke("Ready", "RPC", LogLevel.Info);
+            Ready?.Invoke(message);
+
+            if (_autoStart)
+                Start();
         }
     }
 }

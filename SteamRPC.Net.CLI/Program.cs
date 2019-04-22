@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using System.Timers;
 using CommandLine;
 using DiscordRPC;
+using DiscordRPC.Message;
 using Newtonsoft.Json;
 
 namespace SteamRPC.Net.CLI
@@ -12,6 +13,7 @@ namespace SteamRPC.Net.CLI
     {
         private readonly RichPresenceConverter _converter;
         private readonly Timer _timer;
+        private readonly Assets _assets;
         private RichPresence _currentPresence;
 
         public Program(string[] args)
@@ -26,6 +28,9 @@ namespace SteamRPC.Net.CLI
                 (SteamAppId) appId, imageKey: config.SelectedClient.ImageKey, 
                 imageText: config.SelectedClient.ImageText);
 
+            _assets = new Assets
+                {LargeImageKey = config.SelectedClient.ImageKey, LargeImageText = config.SelectedClient.ImageText};
+
             _timer = new Timer
             {
                 AutoReset = true,
@@ -39,30 +44,35 @@ namespace SteamRPC.Net.CLI
         {
             _converter.Log += LogMessage;
             _converter.Ready += HandleReady;
-            _converter.PresenceUpdated += HandlePresenceUpdate;
+            _converter.AssetsUpdated += assets =>
+                _currentPresence = _converter.Client.UpdateLargeAsset(assets.LargeImageKey, assets.LargeImageText);
+            _converter.DetailsUpdated += details =>
+                _currentPresence = _converter.Client.UpdateDetails(details);
+            _converter.PartyUpdated += party =>
+                _currentPresence = _converter.Client.UpdateParty(party);
+            _converter.StateUpdated += state =>
+                _currentPresence = _converter.Client.UpdateState(state);
+            _converter.TimestampsUpdated += timestamps =>
+                _currentPresence = _converter.Client.UpdateStartTime(timestamps.Start ?? DateTime.UtcNow);
 
             _timer.Start();
             _converter.Initialize();
+            _converter.Client.UpdateLargeAsset(_assets.LargeImageKey, _assets.LargeImageText);
 
             await Task.Delay(-1);
         }
 
-        private void HandlePresenceUpdate(PresenceUpdateEventArgs args)
+        private void HandleReady(ReadyMessage message)
         {
-            _currentPresence = args.Presence;
-        }
-
-        private void HandleReady(ReadyEventArgs args)
-        {
-            Logger.Log($"Client ready for user {args.Message.User}", "RPC", ConsoleColor.Green);
+            Logger.Log($"Client ready for user {message.User}", "RPC", ConsoleColor.Green);
             Logger.Log("Console will be cleared in 10 seconds to start displaying rich presence data.", "RPC", ConsoleColor.Yellow);
             _timer.Start();
         }
 
-        private void LogMessage(LogEventArgs args)
+        private void LogMessage(string value, string source, LogLevel level)
         {
             ConsoleColor color;
-            switch (args.Level)
+            switch (level)
             {
                 case LogLevel.Debug:
                     color = ConsoleColor.DarkGray;
@@ -83,7 +93,7 @@ namespace SteamRPC.Net.CLI
                     throw new ArgumentOutOfRangeException();
             }
 
-            Logger.Log(args.Message, args.Source, color);
+            Logger.Log(value, source, color);
         }
 
         private void UpdateConsole()
@@ -92,10 +102,14 @@ namespace SteamRPC.Net.CLI
             var builder = new StringBuilder()
                 .AppendLine(_currentPresence.Details);
             if (!string.IsNullOrWhiteSpace(_currentPresence.State))
-                builder.AppendLine(
-                    $"{_currentPresence.State} ({_currentPresence.Party.Size} of {_currentPresence.Party.Max})");
+            {
+                builder.AppendLine(_currentPresence.Party is null 
+                    ? _currentPresence.State 
+                    : $"{_currentPresence.State} ({_currentPresence.Party.Size} of {_currentPresence.Party.Max})");
+            }
+                
 
-            if (_currentPresence.Timestamps.Start.HasValue)
+            if (_currentPresence.Timestamps?.Start.HasValue == true)
             {
                 var elapsed = DateTime.UtcNow - _currentPresence.Timestamps.Start.Value;
                 if (elapsed.Hours > 0)

@@ -1,6 +1,6 @@
 ﻿namespace SteamRPC.Net
 {
-    public enum MatchGroupLocation
+    public enum TF2MatchGroupLocation
     {
         None = 0,
         Casual,

@@ -1,6 +1,6 @@
 ﻿namespace SteamRPC.Net
 {
-    public enum RichPresenceState
+    public enum TF2PresenceState
     {
         None = 0,
         PlayingCommunity,
