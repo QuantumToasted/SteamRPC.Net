@@ -2,6 +2,7 @@
 {
     public enum SteamAppId
     {
-        TF2 = 440
+        TF2 = 440,
+        Unturned = 304930
     }
 }
