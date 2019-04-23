@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Timers;
 using DiscordRPC;
@@ -84,6 +84,13 @@ namespace SteamRPC.Net
                         LargeImageText = _imageText
                     });
                     break;
+                case SteamAppId.Unturned:
+                    presence = new UnturnedRichPresence(_steamId, new Assets
+                    {
+                        LargeImageKey = _imageKey,
+                        LargeImageText = _imageText
+                    });
+                    break;
                 default:
                     presence = new DefaultRichPresence();
                     break;
@@ -123,6 +130,13 @@ namespace SteamRPC.Net
             {
                 case SteamAppId.TF2:
                     presence = new TF2RichPresence(_steamId, new Assets
+                    {
+                        LargeImageKey = _imageKey,
+                        LargeImageText = _imageText
+                    });
+                    break;
+                case SteamAppId.Unturned:
+                    presence = new UnturnedRichPresence(_steamId, new Assets
                     {
                         LargeImageKey = _imageKey,
                         LargeImageText = _imageText
