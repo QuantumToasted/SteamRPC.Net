@@ -4,6 +4,11 @@
       "ClientId": 531975060576010271,
       "ImageKey": "tf2_icon",
       "ImageText": "Team Fortress 2"
+    },
+    "304930": {
+      "ClientId": 570329558327361545,
+      "ImageKey": "unturned_icon",
+      "ImageText": "Unturned"
     }
   },
   "SteamId": 76561198051696861
