@@ -173,6 +173,13 @@ namespace SteamRPC.Net
                 updated = true;
             }
 
+            if (presence.Assets?.LargeImageKey != SteamRichPresence.LastPresence?.Assets?.LargeImageKey ||
+                presence.Assets?.SmallImageKey != SteamRichPresence.LastPresence?.Assets?.SmallImageKey)
+            {
+                AssetsUpdated?.Invoke(presence.Assets);
+                updated = true;
+            }
+
             if (updated)
             {
                 SteamRichPresence.LastPresence = presence;
